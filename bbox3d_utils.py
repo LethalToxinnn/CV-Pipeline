@@ -76,7 +76,7 @@ class BBox3DEstimator:
         
         Args:
             bbox_2d (list): 2D bounding box [x1, y1, x2, y2]
-            depth_value (float): Depth value at the center of the bounding box
+            depth_value (float): Depth value at the center of the bounding box (meters)
             class_name (str): Class name of the object
             object_id (int): Object ID for tracking (None for no tracking)
             
@@ -116,9 +116,8 @@ class BBox3DEstimator:
             dimensions[1] = dimensions[0] * 0.3  # width
             dimensions[2] = dimensions[0] * 0.3  # length
         
-        # Convert depth to distance - use a larger range for better visualization
-        # Map depth_value (0-1) to a range of 1-10 meters
-        distance = 1.0 + depth_value * 9.0  # Increased from 4.0 to 9.0 for a larger range
+        # Use metric depth value directly (meters)
+        distance = depth_value
         
         # Calculate 3D location
         location = self._backproject_point(center_x, center_y, distance)
@@ -690,10 +689,8 @@ class BirdEyeView:
             # Extract parameters
             class_name = box_3d['class_name'].lower()
             
-            # Scale depth to fit within 1-5 meters range
-            depth_value = box_3d.get('depth_value', 0.5)
-            # Map depth value (0-1) to a range of 1-5 meters
-            depth = 1.0 + depth_value * 4.0
+            # Use metric depth value directly (meters)
+            depth = box_3d.get('depth_value', 2.0)  # Default to 2 meters if not present
             
             # Get 2D box dimensions for size estimation
             if 'bbox_2d' in box_3d:
@@ -726,7 +723,7 @@ class BirdEyeView:
             # Calculate position in BEV with flipped axes
             # X-axis points upward, Y-axis points rightward
             
-            # Calculate Y position (upward) based on depth
+            # Calculate Y position (upward) based on depth (meters)
             bev_y = self.origin_y - int(depth * self.scale)
             
             # Calculate X position (rightward) based on horizontal position in image

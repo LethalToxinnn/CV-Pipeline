@@ -1,4 +1,4 @@
-# YOLO-3D
+# CV-Pipeline
 
 A real-time 3D object detection system that combines YOLOv11 for object detection with Depth Anything v2 for depth estimation to create pseudo-3D bounding boxes and bird's eye view visualization.
 
@@ -24,8 +24,8 @@ A real-time 3D object detection system that combines YOLOv11 for object detectio
 
 1. Clone this repository:
    ```
-   git clone https://github.com/niconielsen32/YOLO-3D.git
-   cd YOLO-3D
+   git clone https://github.com/LethalToxinnn/CV-Pipeline.git
+   cd CV-Pipeline
    ```
 
 2. Install dependencies:
@@ -42,6 +42,16 @@ Run the main script:
 ```bash
 python run.py
 ```
+
+### WebRTC Client Usage
+
+For remote video processing from Raspberry Pi devices:
+
+```bash
+python client1.py
+```
+
+The WebRTC client connects to a WebSocket server (default: `ws://172.20.66.142:8080/ws`) and processes incoming video streams with 3D object detection in real-time.
 
 ### Configuration Options
 
@@ -68,14 +78,15 @@ You can modify the following parameters in `run.py`:
 ## Project Structure
 
 ```
-YOLO-3D/
+CV-Pipeline/
 
 │── run.py                  # Main script
 │── detection_model.py      # YOLOv11 object detection
 │── depth_model.py          # Depth Anything v2 depth estimation
 │── bbox3d_utils.py         # 3D bounding box utilities
 │── load_camera_params.py   # Camera parameter utilities
-├── requirements.txt            # Project dependencies
+├── requirements.txt        # Project dependencies
+├── client1.py              # Runs webrtc client
 └── README.md                   # This file
 ```
 
@@ -87,7 +98,17 @@ YOLO-3D/
 4. **Visualization**: Renders 3D boxes and bird's eye view for better spatial understanding
 
 
+## Changes from Original Repository
+
+This repository is a fork of the original [YOLO-3D](https://github.com/niconielsen32/YOLO-3D.git) project with the following enhancements:
+
+- **Repository Rename**: Changed from "YOLO-3D" to "CV-Pipeline" to better reflect the comprehensive computer vision pipeline
+- **WebRTC Client**: Added `client1.py` for WebRTC-based real-time video streaming from Raspberry Pi devices, enabling remote 3D object detection processing
+- **Enhanced Documentation**: Updated project structure and documentation to reflect new components
+
 ## Acknowledgments
 
+- Original YOLO-3D project by [niconielsen32](https://github.com/niconielsen32/YOLO-3D.git)
 - YOLOv11 by Ultralytics
-- Depth Anything v2 by Microsoft 
+- Depth Anything v2 by Microsoft
+

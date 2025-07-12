@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import torch
 from pathlib import Path
+from collections import deque
 
 # Set MPS fallback for operations not supported on Apple Silicon
 if hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -28,20 +29,34 @@ def main():
     
     # Model settings
     yolo_model_size = "nano"  # YOLOv11 model size: "nano", "small", "medium", "large", "extra"
-    depth_model_size = "small"  # Depth Anything v2 model size: "small", "base", "large"
+    depth_model_size = "base"  # Depth Anything v2 model size: "small", "base", "large"
     
     # Device settings
-    device = 'cpu'  # Force CPU for stability
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'  # Use CUDA if available, otherwise CPU
+    
+    # Enable CUDA optimizations
+    if device == 'cuda':
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
     
     # Detection settings
     conf_threshold = 0.25  # Confidence threshold for object detection
     iou_threshold = 0.45  # IoU threshold for NMS
-    classes = None  # Filter by class, e.g., [0, 1, 2] for specific classes, None for all classes
+    # Common classes to detect (COCO dataset class IDs):
+    # 0: person, 2: car, 3: motorcycle, 5: bus, 7: truck, 8: boat, 9: traffic light
+    # 11: stop sign, 13: bench, 14: bird, 15: cat, 16: dog, 17: horse, 18: sheep
+    # 19: cow, 20: elephant, 21: bear, 22: zebra, 23: giraffe
+    classes = [0,1,2,3,5,7,14,15,16,17,18,19,24,26,39,41,64,67,72,73,76]  # Removed 77 (teddy bear)
     
     # Feature toggles
     enable_tracking = True  # Enable object tracking
     enable_bev = True  # Enable Bird's Eye View visualization
     enable_pseudo_3d = True  # Enable pseudo-3D visualization
+    
+    # Processing settings
+    process_every_n_frames = 3  # Process every nth frame for depth estimation
+    frame_count = 0
     
     # Camera parameters - simplified approach
     camera_params_file = None  # Path to camera parameters file (None to use default parameters)
@@ -70,18 +85,14 @@ def main():
             device='cpu'
         )
     
-    try:
-        depth_estimator = DepthEstimator(
-            model_size=depth_model_size,
-            device=device
-        )
-    except Exception as e:
-        print(f"Error initializing depth estimator: {e}")
-        print("Falling back to CPU for depth estimation")
-        depth_estimator = DepthEstimator(
-            model_size=depth_model_size,
-            device='cpu'
-        )
+    # Initialize depth estimator (default: metric, indoor)
+    depth_estimator = DepthEstimator(
+        model_size=depth_model_size,
+        metric=True,  # Use metric depth (meters)
+        scene_type='indoor'  # Change to 'outdoor' for outdoor scenes
+    )
+    # Set use_fast=True for better performance
+    depth_estimator.pipe.use_fast = True
     
     # Initialize 3D bounding box estimator with default parameters
     # Simplified approach - focus on 2D detection with depth information
@@ -118,7 +129,6 @@ def main():
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
     # Initialize variables for FPS calculation
-    frame_count = 0
     start_time = time.time()
     fps_display = "FPS: --"
     
@@ -155,8 +165,13 @@ def main():
             
             # Step 2: Depth Estimation
             try:
-                depth_map = depth_estimator.estimate_depth(original_frame)
-                depth_colored = depth_estimator.colorize_depth(depth_map)
+                # Only process depth every nth frame
+                if frame_count % process_every_n_frames == 0:
+                    depth_map = depth_estimator.estimate_depth(original_frame)
+                    depth_colored = depth_estimator.colorize_depth(depth_map)
+                else:
+                    # Reuse previous depth map
+                    depth_colored = depth_colored if 'depth_colored' in locals() else np.zeros((height, width, 3), dtype=np.uint8)
             except Exception as e:
                 print(f"Error during depth estimation: {e}")
                 # Create a dummy depth map
@@ -200,13 +215,26 @@ def main():
                     }
                     
                     boxes_3d.append(box_3d)
-                    
-                    # Keep track of active IDs for tracker cleanup
                     if obj_id is not None:
                         active_ids.append(obj_id)
                 except Exception as e:
                     print(f"Error processing detection: {e}")
                     continue
+            
+            # Calculate and display FPS
+            frame_count += 1
+            if frame_count % 10 == 0:  # Update FPS every 10 frames
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                fps_value = frame_count / elapsed_time
+                fps_display = f"FPS: {fps_value:.1f}"
+            
+            # Add FPS and device info to the result frame
+            text = f"{fps_display} | Device: {device}"
+            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_x = width - text_size[0] - 10  # 10 pixels padding from right edge
+            cv2.putText(result_frame, text, (text_x, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             
             # Clean up trackers for objects that are no longer detected
             bbox3d_estimator.cleanup_trackers(active_ids)
@@ -270,28 +298,6 @@ def main():
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                 except Exception as e:
                     print(f"Error drawing BEV: {e}")
-            
-            # Calculate and display FPS
-            frame_count += 1
-            if frame_count % 10 == 0:  # Update FPS every 10 frames
-                end_time = time.time()
-                elapsed_time = end_time - start_time
-                fps_value = frame_count / elapsed_time
-                fps_display = f"FPS: {fps_value:.1f}"
-            
-            # Add FPS and device info to the result frame
-            cv2.putText(result_frame, f"{fps_display} | Device: {device}", (10, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            
-            
-            # Add depth map to the corner of the result frame
-            try:
-                depth_height = height // 4
-                depth_width = depth_height * width // height
-                depth_resized = cv2.resize(depth_colored, (depth_width, depth_height))
-                result_frame[0:depth_height, 0:depth_width] = depth_resized
-            except Exception as e:
-                print(f"Error adding depth map to result: {e}")
             
             # Write frame to output video
             out.write(result_frame)
