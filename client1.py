@@ -43,7 +43,7 @@ except ImportError as e:
 class WebRTCVideoReceiver:
     """WebRTC client to receive video stream from Raspberry Pi"""
     
-    def __init__(self, server_url="ws://172.20.66.142:8080/ws"):
+    def __init__(self, server_url="ws://0.0.0.0:8080/ws"):
         self.server_url = server_url
         self.pc = None
         self.frame_queue = queue.Queue(maxsize=5)
@@ -194,7 +194,7 @@ class WebRTCVideoReceiver:
 class WebRTCVideoSource:
     """Video source that wraps WebRTC receiver to work like cv2.VideoCapture"""
     
-    def __init__(self, server_url="ws://.172.20.66.142:8080/ws"):
+    def __init__(self, server_url="ws://0.0.0.0:8080/ws"):
         self.receiver = WebRTCVideoReceiver(server_url)
         self.loop = None
         self.thread = None
@@ -256,7 +256,7 @@ class WebRTCVideoSource:
 
 def main():
     """Main function"""
-    server_ip = "172.20.66.142"
+    server_ip = "0.0.0.0"
     server_port = 8080
     server_url = f"ws://{server_ip}:{server_port}/ws"
     
