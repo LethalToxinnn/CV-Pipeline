@@ -51,7 +51,7 @@ For remote video processing from Raspberry Pi devices:
 python client1.py
 ```
 
-The WebRTC client connects to a WebSocket server (default: `ws://172.20.66.142:8080/ws`) and processes incoming video streams with 3D object detection in real-time.
+The WebRTC client connects to a WebSocket server (default: `ws://000.00.00.000:8080/ws`) and processes incoming video streams with 3D object detection in real-time.
 
 ### Configuration Options
 
